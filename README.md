@@ -30,19 +30,17 @@ The project is structured into two main parts:
 │   ├── styles/          # Global styles
 │   └── ... (Next.js config files)
 │
-├── backend/             # Backend services and infrastructure
-│   ├── python_scripts/  # Sensor simulation scripts
-│   ├── node_red/       # Node-RED flows
-│   ├── config/         # Service configurations
-│   ├── docker/         # Docker-related files
-│   └── requirements/   # Python dependencies
+├── python_scripts/      # Sensor simulation scripts
+├── node_red/           # Node-RED flows and configurations
+├── config/             # Service configurations
+├── docker/             # Docker-related files
+├── requirements/       # Python dependencies
+├── data/              # Data storage
+│   ├── influxdb/     # InfluxDB data
+│   ├── mosquitto/    # MQTT data
+│   └── grafana/      # Grafana data
 │
-├── data/               # Data storage
-│   ├── influxdb/      # InfluxDB data
-│   ├── mosquitto/     # MQTT data
-│   └── grafana/       # Grafana data
-│
-├── logs/              # Application logs
+├── logs/             # Application logs
 ├── docker-compose.yml # Docker services configuration
 └── predictive_maintenance.csv  # Dataset for AI model training
 ```
@@ -64,7 +62,6 @@ The project is structured into two main parts:
 
 2. Set up Python environment for sensor simulation:
    ```bash
-   cd backend
    python -m venv venv
    source venv/bin/activate  # On Windows: .\venv\Scripts\activate
    pip install -r requirements/requirements.txt
