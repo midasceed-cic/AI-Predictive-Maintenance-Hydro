@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -43,7 +43,35 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Switch } from "@/components/ui/switch"
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
+import { LatLngExpression } from "leaflet"
 import "leaflet/dist/leaflet.css"
+import { useGrafana, GrafanaDashboardEmbed } from '@/lib/grafana'
+
+interface Dashboard {
+  uid: string;
+  title: string;
+}
+
+interface Alert {
+  name: string;
+  message: string;
+}
+
+declare global {
+  namespace JSX {
+    interface IntrinsicElements {
+      main: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>;
+      div: React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
+      h1: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+      h2: React.DetailedHTMLProps<React.HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>;
+      button: React.DetailedHTMLProps<React.ButtonHTMLAttributes<HTMLButtonElement>, HTMLButtonElement>;
+      ul: React.DetailedHTMLProps<React.HTMLAttributes<HTMLUListElement>, HTMLUListElement>;
+      li: React.DetailedHTMLProps<React.LiHTMLAttributes<HTMLLIElement>, HTMLLIElement>;
+      span: React.DetailedHTMLProps<React.HTMLAttributes<HTMLSpanElement>, HTMLSpanElement>;
+      p: React.DetailedHTMLProps<React.HTMLAttributes<HTMLParagraphElement>, HTMLParagraphElement>;
+    }
+  }
+}
 
 const powerOutputData = [
   { time: "00:00", output: 110, demand: 100 },
@@ -72,524 +100,97 @@ const reservoirData = [
 
 const COLORS = ["#00f0ff", "#ff3e3e", "#FFBB28", "#FF8042"]
 
-export default function Dashboard() {
-  const [selectedTab, setSelectedTab] = useState("overview")
-  const [currentOutput, setCurrentOutput] = useState(127.5)
-  const [isSimulationRunning, setIsSimulationRunning] = useState(false)
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [isDarkMode, setIsDarkMode] = useState(true)
+export default function Home() {
+  const grafana = useGrafana()
+  const [dashboards, setDashboards] = useState<Dashboard[]>([])
+  const [selectedDashboard, setSelectedDashboard] = useState<string | null>(null)
+  const [alerts, setAlerts] = useState<Alert[]>([])
 
   useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (isSimulationRunning) {
-      interval = setInterval(() => {
-        setCurrentOutput((prev) => {
-          const change = (Math.random() - 0.5) * 5
-          return Math.max(0, Math.min(200, prev + change))
-        })
-      }, 5000)
-    }
-    return () => clearInterval(interval)
-  }, [isSimulationRunning])
+    // Fetch available dashboards
+    grafana.getDashboards()
+      .then((data: Dashboard[]) => setDashboards(data))
+      .catch(console.error)
 
-  useEffect(() => {
-    const timeInterval = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-    return () => clearInterval(timeInterval)
+    // Fetch current alerts
+    grafana.getAlerts()
+      .then((data: Alert[]) => setAlerts(data))
+      .catch(console.error)
+
+    // Refresh alerts every minute
+    const alertInterval = setInterval(() => {
+      grafana.getAlerts()
+        .then((data: Alert[]) => setAlerts(data))
+        .catch(console.error)
+    }, 60000)
+
+    return () => clearInterval(alertInterval)
   }, [])
 
-  useEffect(() => {
-    // Apply dark mode class to body
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
-  }, [isDarkMode])
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    })
-  }
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-US", {
-      month: "2-digit",
-      day: "2-digit",
-      year: "numeric",
-    })
-  }
-
   return (
-    <div className="min-h-screen bg-[#0a0e14] text-white">
-      <div className="mx-auto max-w-full space-y-2 p-2">
-        <header className="flex items-center justify-between bg-[#0a0e14] p-2 border-b border-[#00f0ff]/30">
-          <div className="flex items-center">
-            <div className="mr-4">
-              <Avatar className="h-10 w-10 border border-[#00f0ff]">
-                <AvatarImage
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Untitled%20%283%29.jpg-S5P7abw3YajZt6rx5eIoocEy0bBKnF.jpeg"
-                  alt="AI Logo"
-                />
-                <AvatarFallback>AI</AvatarFallback>
-              </Avatar>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-[#00f0ff]">
-                MIDAS <span className="text-xs bg-[#00f0ff]/20 px-1 py-0.5 text-[#00f0ff]">creed</span>
+    <main className="min-h-screen p-8">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8">
+          Hydro Station Monitoring
               </h1>
-              <p className="text-xs text-[#00f0ff]/70">AI POWERED HYDROPOWER CONTROL SYSTEM</p>
+
+        {/* Dashboard Selection */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-semibold mb-4">Dashboards</h2>
+          <div className="flex gap-4">
+            {dashboards.map((dashboard: Dashboard) => (
+              <button
+                key={dashboard.uid}
+                onClick={() => setSelectedDashboard(dashboard.uid)}
+                className={`px-4 py-2 rounded ${
+                  selectedDashboard === dashboard.uid
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                }`}
+              >
+                {dashboard.title}
+              </button>
+            ))}
             </div>
           </div>
 
-          <div className="flex space-x-6 items-center">
-            <div className="flex flex-col items-end">
-              <div className="text-xs text-[#00f0ff]/70">Edition Information</div>
-              <div className="text-xs text-[#00f0ff]/70">V0.04 14/08</div>
-            </div>
-            <div className="flex flex-col items-end">
-              <div className="text-2xl font-mono text-[#00f0ff]">{formatTime(currentTime)}</div>
-              <div className="text-xs text-[#00f0ff]/70">{formatDate(currentTime)}</div>
-            </div>
-          </div>
-        </header>
-
-        <div className="grid grid-cols-12 gap-2">
-          <div className="col-span-2 space-y-2">
-            <div className="industrial-card p-3 h-full">
-              <div className="corner-accent corner-accent-tl"></div>
-              <div className="corner-accent corner-accent-tr"></div>
-              <div className="corner-accent corner-accent-bl"></div>
-              <div className="corner-accent corner-accent-br"></div>
-
-              <div className="equipment-id mb-4">T3</div>
-              <div className="text-xs text-[#00f0ff]/70 mb-1">SYSTEM INFO</div>
-
-              <div className="space-y-3">
-                <div className="flex items-center">
-                  <div className="status-indicator status-optimal"></div>
-                  <div className="text-sm">Main Turbine Unit 1</div>
-                </div>
-                <div className="flex items-center">
-                  <div className="status-indicator status-warning"></div>
-                  <div className="text-sm">Dam Gates System</div>
-                </div>
-                <div className="flex items-center">
-                  <div className="status-indicator status-optimal"></div>
-                  <div className="text-sm">Generator Unit 1</div>
-                </div>
-                <div className="flex items-center">
-                  <div className="status-indicator status-critical"></div>
-                  <div className="text-sm">Reservoir Control</div>
+        {/* Active Alerts */}
+        {alerts.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-semibold mb-4">Active Alerts</h2>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <ul className="space-y-2">
+                {alerts.map((alert: Alert, index: number) => (
+                  <li
+                    key={index}
+                    className="flex items-center text-red-700"
+                  >
+                    <span className="mr-2">⚠️</span>
+                    {alert.name}: {alert.message}
+                  </li>
+                ))}
+              </ul>
                 </div>
               </div>
+        )}
 
-              <div className="mt-4 pt-4 border-t border-[#00f0ff]/30">
-                <div className="text-xs text-[#00f0ff]/70 mb-2">SYSTEM CONTROL</div>
-                <Button
-                  size="sm"
-                  className="w-full mb-2 bg-[#00f0ff]/20 hover:bg-[#00f0ff]/30 text-[#00f0ff] border border-[#00f0ff]/50"
-                  onClick={() => setIsSimulationRunning(!isSimulationRunning)}
-                >
-                  {isSimulationRunning ? "Stop Simulation" : "Start Simulation"}
-                </Button>
-                <Button
-                  size="sm"
-                  className="w-full bg-[#00f0ff]/20 hover:bg-[#00f0ff]/30 text-[#00f0ff] border border-[#00f0ff]/50"
-                >
-                  <Terminal className="mr-2 h-4 w-4" />
-                  System Diagnostics
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="col-span-10 space-y-2">
-            <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-2">
-              <div className="flex justify-between items-center">
-                <TabsList className="bg-[#0a0e14] border border-[#00f0ff]/30">
-                  <TabsTrigger
-                    value="overview"
-                    className="data-[state=active]:bg-[#00f0ff]/20 data-[state=active]:text-[#00f0ff]"
-                  >
-                    Overview
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="environmental"
-                    className="data-[state=active]:bg-[#00f0ff]/20 data-[state=active]:text-[#00f0ff]"
-                  >
-                    Environmental
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="maintenance"
-                    className="data-[state=active]:bg-[#00f0ff]/20 data-[state=active]:text-[#00f0ff]"
-                  >
-                    Maintenance
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="security"
-                    className="data-[state=active]:bg-[#00f0ff]/20 data-[state=active]:text-[#00f0ff]"
-                  >
-                    Security
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="analytics"
-                    className="data-[state=active]:bg-[#00f0ff]/20 data-[state=active]:text-[#00f0ff]"
-                  >
-                    Analytics
-                  </TabsTrigger>
-                </TabsList>
-
-                <div className="flex space-x-2">
-                  <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white">
-                    <Activity className="mr-2 h-4 w-4" />
-                    System Health: Optimal
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-[#00f0ff]/20 hover:bg-[#00f0ff]/30 text-[#00f0ff] border border-[#00f0ff]/50"
-                  >
-                    <CalendarDays className="mr-2 h-4 w-4" />
-                    Schedule Maintenance
-                  </Button>
-                </div>
-              </div>
-
-              <TabsContent value="overview" className="space-y-2 mt-2">
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="col-span-4">
-                    <div className="industrial-card p-4 relative">
-                      <div className="corner-accent corner-accent-tl"></div>
-                      <div className="corner-accent corner-accent-tr"></div>
-                      <div className="corner-accent corner-accent-bl"></div>
-                      <div className="corner-accent corner-accent-br"></div>
-
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="equipment-id mb-2">LD-2</div>
-                          <div className="text-xs text-[#00f0ff]/70">Primary Reservoir • Shire River Facility</div>
+        {/* Dashboard Display */}
+        {selectedDashboard ? (
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            <GrafanaDashboardEmbed
+              dashboardUid={selectedDashboard}
+              height="800px"
+            />
                         </div>
-                        <HoverCard>
-                          <HoverCardTrigger asChild>
-                            <div className="text-right cursor-help">
-                              <div className="text-xs text-[#00f0ff]/70">Current Output</div>
-                              <div className="digital-readout">{currentOutput.toFixed(1)} MW</div>
-                            </div>
-                          </HoverCardTrigger>
-                          <HoverCardContent className="w-80 bg-[#0a0e14] border border-[#00f0ff]/50 text-white">
-                            <div className="flex justify-between space-x-4">
-                              <div className="space-y-1">
-                                <h4 className="text-sm font-semibold text-[#00f0ff]">Power Output Details</h4>
-                                <p className="text-sm">
-                                  Current output is at {((currentOutput / 150) * 100).toFixed(1)}% of maximum capacity.
-                                </p>
-                                <p className="text-sm">Peak today: 160 MW at 16:00</p>
-                                <p className="text-sm">Daily average: 132.8 MW</p>
+        ) : (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">
+              Select a dashboard to view
+            </p>
                               </div>
+        )}
                             </div>
-                          </HoverCardContent>
-                        </HoverCard>
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-4 mt-4 industrial-grid p-4">
-                        <div className="flex flex-col space-y-1">
-                          <div className="text-xs text-[#00f0ff]/70">Reservoir Level</div>
-                          <div className="digital-readout">452.3 m</div>
-                          <div className="text-xs text-[#00f0ff]/70">Above sea level</div>
-                        </div>
-                        <div className="flex flex-col space-y-1">
-                          <div className="text-xs text-[#00f0ff]/70">Water Flow Rate</div>
-                          <div className="digital-readout">850 m³/s</div>
-                          <div className="text-xs text-[#00f0ff]/70">Current flow</div>
-                        </div>
-                        <div className="flex flex-col space-y-1">
-                          <div className="text-xs text-[#00f0ff]/70">Turbine Efficiency</div>
-                          <div className="digital-readout">92%</div>
-                          <div className="text-xs text-[#00f0ff]/70">Overall efficiency</div>
-                        </div>
-                        <div className="flex flex-col space-y-1">
-                          <div className="text-xs text-[#00f0ff]/70">Gate Opening</div>
-                          <div className="digital-readout">75%</div>
-                          <div className="text-xs text-[#00f0ff]/70">Current position</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="industrial-card p-3">
-                    <div className="corner-accent corner-accent-tl"></div>
-                    <div className="corner-accent corner-accent-tr"></div>
-                    <div className="corner-accent corner-accent-bl"></div>
-                    <div className="corner-accent corner-accent-br"></div>
-
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="text-xs text-[#00f0ff]/70">Reservoir Level</div>
-                      <Droplets className="h-4 w-4 text-[#00f0ff]" />
-                    </div>
-
-                    <div className="digital-readout mb-2">85%</div>
-                    <div className="h-[100px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={reservoirData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={30}
-                            outerRadius={40}
-                            fill="#8884d8"
-                            paddingAngle={5}
-                            dataKey="value"
-                          >
-                            {reservoirData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="text-xs text-[#00f0ff]/70 mt-2">Current: 452.3 m above sea level</div>
-                    <div className="text-xs text-[#00f0ff]/70">Max: 475 m | Min: 420 m</div>
-                  </div>
-
-                  <div className="industrial-card p-3">
-                    <div className="corner-accent corner-accent-tl"></div>
-                    <div className="corner-accent corner-accent-tr"></div>
-                    <div className="corner-accent corner-accent-bl"></div>
-                    <div className="corner-accent corner-accent-br"></div>
-
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="text-xs text-[#00f0ff]/70">Turbine Performance</div>
-                      <Gauge className="h-4 w-4 text-[#00f0ff]" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span>Efficiency</span>
-                        <span className="text-[#00f0ff]">92%</span>
-                      </div>
-                      <Progress value={92} className="h-1 bg-[#00f0ff]/20" indicatorClassName="bg-[#00f0ff]" />
-
-                      <div className="flex justify-between text-xs">
-                        <span>RPM</span>
-                        <span className="text-[#00f0ff]">180.5</span>
-                      </div>
-                      <Progress value={75} className="h-1 bg-[#00f0ff]/20" indicatorClassName="bg-[#00f0ff]" />
-
-                      <div className="flex justify-between text-xs">
-                        <span>Load</span>
-                        <span className="text-[#00f0ff]">85%</span>
-                      </div>
-                      <Progress value={85} className="h-1 bg-[#00f0ff]/20" indicatorClassName="bg-[#00f0ff]" />
-
-                      <div className="flex justify-between text-xs">
-                        <span>Vibration</span>
-                        <span className="text-[#00f0ff]">0.15 mm/s</span>
-                      </div>
-                      <Progress value={15} className="h-1 bg-[#00f0ff]/20" indicatorClassName="bg-[#00f0ff]" />
-                    </div>
-                  </div>
-
-                  <div className="industrial-card p-3">
-                    <div className="corner-accent corner-accent-tl"></div>
-                    <div className="corner-accent corner-accent-tr"></div>
-                    <div className="corner-accent corner-accent-bl"></div>
-                    <div className="corner-accent corner-accent-br"></div>
-
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="text-xs text-[#00f0ff]/70">Water Metrics</div>
-                      <Waves className="h-4 w-4 text-[#00f0ff]" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1">
-                          <Droplets className="h-3 w-3 text-[#00f0ff]" />
-                          <span>Flow Rate</span>
-                        </div>
-                        <span className="text-[#00f0ff]">850 m³/s</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1">
-                          <Mountain className="h-3 w-3 text-[#00f0ff]" />
-                          <span>Head</span>
-                        </div>
-                        <span className="text-[#00f0ff]">75 m</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1">
-                          <Wind className="h-3 w-3 text-[#00f0ff]" />
-                          <span>Pressure</span>
-                        </div>
-                        <span className="text-[#00f0ff]">7.35 bar</span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1">
-                          <ThermometerIcon className="h-3 w-3 text-[#00f0ff]" />
-                          <span>Water Temp</span>
-                        </div>
-                        <span className="text-[#00f0ff]">22.5°C</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="industrial-card-red p-3">
-                    <div className="corner-accent corner-accent-tl"></div>
-                    <div className="corner-accent corner-accent-tr"></div>
-                    <div className="corner-accent corner-accent-bl"></div>
-                    <div className="corner-accent corner-accent-br"></div>
-
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="text-xs text-[#ff3e3e]/70">Active Alerts</div>
-                      <AlertTriangle className="h-4 w-4 text-[#ff3e3e]" />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="bg-[#ff3e3e]/10 border-l-2 border-[#ff3e3e] p-2 text-xs">
-                        <div className="flex items-center">
-                          <AlertTriangle className="h-3 w-3 text-[#ff3e3e] mr-1" />
-                          <div className="font-semibold text-[#ff3e3e]">High Sediment Level</div>
-                        </div>
-                        <div className="ml-4 mt-1">Requires gate adjustment</div>
-                      </div>
-
-                      <div className="bg-[#00f0ff]/10 border-l-2 border-[#00f0ff] p-2 text-xs">
-                        <div className="flex items-center">
-                          <Battery className="h-3 w-3 text-[#00f0ff] mr-1" />
-                          <div className="font-semibold text-[#00f0ff]">Peak Demand Period</div>
-                        </div>
-                        <div className="ml-4 mt-1">Optimizing output</div>
-                      </div>
-
-                      <div className="bg-[#ffcc00]/10 border-l-2 border-[#ffcc00] p-2 text-xs">
-                        <div className="flex items-center">
-                          <Waves className="h-3 w-3 text-[#ffcc00] mr-1" />
-                          <div className="font-semibold text-[#ffcc00]">Increased River Flow</div>
-                        </div>
-                        <div className="ml-4 mt-1">Monitor downstream levels</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="industrial-card p-3">
-                    <div className="corner-accent corner-accent-tl"></div>
-                    <div className="corner-accent corner-accent-tr"></div>
-                    <div className="corner-accent corner-accent-bl"></div>
-                    <div className="corner-accent corner-accent-br"></div>
-
-                    <div className="equipment-id mb-2">BX [41]</div>
-                    <div className="text-xs text-[#00f0ff]/70 mb-2">Power Generation Metrics</div>
-
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <div className="space-y-1">
-                        <div className="text-xs text-[#00f0ff]/70">Daily Output</div>
-                        <div className="digital-readout">2,856 MWh</div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-[#00f0ff]/70">Efficiency</div>
-                        <div className="digital-readout">92%</div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-[#00f0ff]/70">Grid Frequency</div>
-                        <div className="digital-readout">50.02 Hz</div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-xs text-[#00f0ff]/70">Transformer Temp</div>
-                        <div className="digital-readout">65°C</div>
-                      </div>
-                    </div>
-
-                    <div className="h-[200px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={powerOutputData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0, 240, 255, 0.1)" />
-                          <XAxis dataKey="time" stroke="rgba(0, 240, 255, 0.5)" />
-                          <YAxis yAxisId="left" stroke="rgba(0, 240, 255, 0.5)" />
-                          <YAxis yAxisId="right" orientation="right" stroke="rgba(0, 240, 255, 0.5)" />
-                          <Tooltip contentStyle={{ backgroundColor: "#0a0e14", borderColor: "#00f0ff" }} />
-                          <Line yAxisId="left" type="monotone" dataKey="output" stroke="#00f0ff" name="Output (MW)" />
-                          <Line yAxisId="right" type="monotone" dataKey="demand" stroke="#ff3e3e" name="Demand (MW)" />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    <div className="bg-[#00f0ff]/10 border-l-2 border-[#00f0ff] p-2 text-xs mt-3">
-                      <div className="flex items-center">
-                        <Zap className="h-3 w-3 text-[#00f0ff] mr-1" />
-                        <div className="font-semibold text-[#00f0ff]">Current Generation</div>
-                      </div>
-                      <div className="ml-4 mt-1">
-                        {currentOutput.toFixed(1)} MW -{" "}
-                        {currentOutput > 140 ? "Peak" : currentOutput > 100 ? "Normal" : "Low"} output
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="industrial-card p-3">
-                    <div className="corner-accent corner-accent-tl"></div>
-                    <div className="corner-accent corner-accent-tr"></div>
-                    <div className="corner-accent corner-accent-bl"></div>
-                    <div className="corner-accent corner-accent-br"></div>
-
-                    <div className="equipment-id mb-2">L3</div>
-                    <div className="text-xs text-[#00f0ff]/70 mb-2">Weekly Power Output</div>
-
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={weeklyOutputData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(0, 240, 255, 0.1)" />
-                          <XAxis dataKey="day" stroke="rgba(0, 240, 255, 0.5)" />
-                          <YAxis stroke="rgba(0, 240, 255, 0.5)" />
-                          <Tooltip contentStyle={{ backgroundColor: "#0a0e14", borderColor: "#00f0ff" }} />
-                          <Bar dataKey="output" fill="#00f0ff" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="environmental" className="space-y-2 mt-2">
-                <EnvironmentalMonitoringCard />
-                <div className="grid grid-cols-2 gap-2">
-                  <WaterQualityCard />
-                  <FishLadderCard />
-                </div>
-                <GISMapCard />
-              </TabsContent>
-
-              <TabsContent value="maintenance" className="space-y-2 mt-2">
-                <MaintenanceScheduleCard />
-                <EquipmentHealthCard />
-                <PredictiveMaintenanceCard />
-              </TabsContent>
-
-              <TabsContent value="security" className="space-y-2 mt-2">
-                <SecurityOverviewCard />
-                <AccessControlCard />
-              </TabsContent>
-
-              <TabsContent value="analytics" className="space-y-2 mt-2">
-                <AIInsightsCard />
-                <PerformanceMetricsCard />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
-      </div>
-    </div>
+    </main>
   )
 }
 
@@ -739,6 +340,8 @@ function FishLadderCard() {
 }
 
 function GISMapCard() {
+  const center: LatLngExpression = [-15.7861, 35.0058];
+  
   return (
     <div className="industrial-card p-3">
       <div className="corner-accent corner-accent-tl"></div>
@@ -751,17 +354,17 @@ function GISMapCard() {
 
       <div className="h-[400px] border border-[#00f0ff]/30">
         <MapContainer
-          center={[-15.7861, 35.0058]}
+          center={center}
           zoom={13}
           scrollWheelZoom={false}
           style={{ height: "100%", width: "100%" }}
           className="z-0"
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
-          <Marker position={[-15.7861, 35.0058]}>
+          <Marker position={center}>
             <Popup>Shire River Hydropower Complex</Popup>
           </Marker>
         </MapContainer>

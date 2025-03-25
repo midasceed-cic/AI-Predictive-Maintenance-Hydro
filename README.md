@@ -203,7 +203,7 @@ The frontend is designed to integrate with Grafana dashboards, providing:
    ```
 
 2. **Grafana API Integration:**
-   ```javascript
+```javascript
    // Example of fetching dashboard data
    const fetchDashboardData = async () => {
      const response = await fetch('http://localhost:3000/api/dashboards/db/your-dashboard-id', {

@@ -203,3 +203,15 @@
   box-shadow: 0 0 5px var(--red-accent);
 }
 
+/* Leaflet map styles */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.leaflet-div-icon {
+  background: transparent;
+  border: none;
+}
+
