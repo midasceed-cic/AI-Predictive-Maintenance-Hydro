@@ -344,7 +344,7 @@ For production deployment, consider using DigitalOcean, AWS, or Azure for hostin
 Note: The frontend deployment is optional and can be added once development is complete.
 
 ## 8. Contact
-For assistance or inquiries, contact **Michael Lumanga** at [qylumanga@gmail.com](mailto:qylumanga@gmail.com).
+For assistance or inquiries, contact Us
 
 ## 9. Acknowledgments
 - Special thanks to the open-source community for invaluable resources
