@@ -26,7 +26,7 @@ services:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=admin
       - DOCKER_INFLUXDB_INIT_PASSWORD=admin123
-      - DOCKER_INFLUXDB_INIT_ORG=midascreed
+      - DOCKER_INFLUXDB_INIT_ORG=YOUR_ORGANIZATION
       - DOCKER_INFLUXDB_INIT_BUCKET=hydro_data
     volumes:
       - ../data/influxdb:/var/lib/influxdb2
@@ -57,7 +57,7 @@ services:
     - GF_SECURITY_ADMIN_PASSWORD=admin123
     - GF_INFLUXDB_URL=http://influxdb:8086
     - GF_INFLUXDB_TOKEN=iN_k9pJ8WxopeC5XjC4ECE9L_M-wpoBBBSyK32KEONHyBCyv0whfXSf6OjeQ4_9m7zZAUeuNNCB63thFsCKM9Q==
-    - GF_INFLUXDB_ORG=midascreed
+    - GF_INFLUXDB_ORG=YOUR_ORGANIZATION
     - GF_INFLUXDB_BUCKET=hydro_data
   volumes:
     - ../data/grafana:/var/lib/grafana
