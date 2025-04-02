@@ -13,7 +13,7 @@ services:
       - ./data/mosquitto:/mosquitto/data
       - ./logs/mosquitto:/mosquitto/logs
     networks:
-      - oden_net
+      - networkAI
 
   influxdb:
     image: influxdb:2.6
@@ -25,13 +25,13 @@ services:
       - DOCKER_INFLUXDB_INIT_MODE=setup
       - DOCKER_INFLUXDB_INIT_USERNAME=admin
       - DOCKER_INFLUXDB_INIT_PASSWORD=admin123
-      - DOCKER_INFLUXDB_INIT_ORG=midascreed
+      - DOCKER_INFLUXDB_INIT_ORG=YOUR_ORGANIZATION
       - DOCKER_INFLUXDB_INIT_BUCKET=hydro_data
     volumes:
       - ./data/influxdb:/var/lib/influxdb2
       - ./config/influxdb.conf:/etc/influxdb2/influxdb.conf
     networks:
-      - oden_net
+      - networkAI
 
   node_red:
     image: nodered/node-red:latest
@@ -44,7 +44,7 @@ services:
     volumes:
       - ./node_red:/data
     networks:
-      - oden_net
+      - networkAI
 
   grafana:
     image: grafana/grafana:latest
@@ -57,8 +57,8 @@ services:
     volumes:
       - ./data/grafana:/var/lib/grafana
     networks:
-      - oden_net
+      - networkAI
 
 networks:
-  oden_net:
+    networkAI:
     driver: bridge 
